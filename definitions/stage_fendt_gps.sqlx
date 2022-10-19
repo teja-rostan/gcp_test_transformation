@@ -2,6 +2,7 @@ config {
   type: "table"
 }
 
+
 SELECT machineId,
   JSON_EXTRACT_SCALAR(json, '$.t') AS t,
   JSON_EXTRACT_SCALAR(json, '$.lat') AS lat,

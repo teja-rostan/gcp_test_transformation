@@ -3,7 +3,6 @@ config {
   schema: "dwh" 
 }
 
-
 with telematics_data as (
 select 
   timestamp(t.DateTime) as `timestamp`,

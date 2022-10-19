@@ -2,6 +2,7 @@ config {
   type: "table"
 }
 
+
 select *
 from (
   select machineId, values_timestamp, value, type

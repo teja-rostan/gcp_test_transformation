@@ -1,5 +1,6 @@
 config { type: "table" }
 
+
 select 
   * except(run_num), 
   min(timestamp) over(partition by vehicleId, run_num) as start_timestamp,

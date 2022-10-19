@@ -2,6 +2,7 @@ config {
   type: "table"
 }
 
+
 WITH unnest_datas AS (
   SELECT machineId, count,
     JSON_EXTRACT_SCALAR(datas_array, '$.enumerations') AS enumerations,
