@@ -1,0 +1,10 @@
+config {
+  type: "table"
+}
+
+SELECT machineId,
+  JSON_EXTRACT_SCALAR(json, '$.t') AS t,
+  JSON_EXTRACT_SCALAR(json, '$.lat') AS lat,
+  JSON_EXTRACT_SCALAR(json, '$.lng') AS lng
+FROM `elt-test-dev.datalake.fendt_gps` ,
+UNNEST(JSON_EXTRACT_ARRAY(TO_JSON_STRING(route), '$')) json 

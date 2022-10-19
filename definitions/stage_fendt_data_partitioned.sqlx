@@ -1,0 +1,20 @@
+config { 
+  type: "table"
+}
+
+WITH unnest_datas AS (
+  SELECT machineId, count,
+    JSON_EXTRACT_SCALAR(datas_array, '$.enumerations') AS enumerations,
+    JSON_EXTRACT_SCALAR(datas_array, '$.type') AS type,
+    JSON_EXTRACT_SCALAR(datas_array, '$.signalGroup') AS signalGroup,
+    JSON_EXTRACT_SCALAR(datas_array, '$.count') AS datas_count,
+    JSON_EXTRACT_SCALAR(datas_array, '$.unit') AS unit,
+    JSON_EXTRACT(datas_array, '$.values') AS datas_values
+  FROM `elt-test-dev.datalake.fendt_data_partitioned`,
+  UNNEST(JSON_EXTRACT_ARRAY(TO_JSON_STRING(datas), '$')) datas_array
+)
+SELECT machineId, count, enumerations, type, signalGroup, datas_count, unit,
+  JSON_EXTRACT_SCALAR(values_array, '$.timestamp') AS values_timestamp,
+  JSON_EXTRACT_SCALAR(values_array, '$.value') AS value
+FROM unnest_datas,
+UNNEST(JSON_EXTRACT_ARRAY(datas_values, '$')) values_array
