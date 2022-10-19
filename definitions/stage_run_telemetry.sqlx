@@ -1,0 +1,16 @@
+config { type: "table" }
+
+select 
+  * except(run_num), 
+  min(timestamp) over(partition by vehicleId, run_num) as start_timestamp,
+  max(timestamp) over(partition by vehicleId, run_num) as end_timestamp
+from (
+  select * except(start), 1 + sum(start) over(partition by vehicleId order by timestamp) as run_num
+  from (
+    select 
+      *, 
+      coalesce(cast(timestamp_diff(timestamp, lag(timestamp) over(partition by vehicleId order by timestamp), hour) > 1 as int), 0) as start
+    from ${ref("fct_telemetry")}
+    where course is null
+  )
+)
