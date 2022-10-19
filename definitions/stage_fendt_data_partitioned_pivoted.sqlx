@@ -1,0 +1,14 @@
+config { 
+  type: "table"
+}
+
+
+select *
+from (
+  select machineId, values_timestamp, value, type
+  from ${ref("stage_fendt_data_partitioned")}
+)
+pivot (
+  max(value)
+  for type in ('OilPressure', 'LoadAtCurrSpeed', 'EngineSpeed', 'TOTAL_VEHICLE_HOURS', 'CoolantTemperature', 'WheelBasedVehicleSpeed', 'FuelLevel', 'BatteryPotentialSwitched', 'CatalystTankLevel', 'FuelRate', 'TransOilTemp','TotalDEFConsumption', 'REAR_DRAFT', 'HYDR_OIL_LEVEL', 'HRSengineHours', 'OutdoorTemp', 'WHEEL_SLIP', 'ENGINE_TRIP_FUEL', 'HITCH_POSITION_REAR', 'HITCH_POSITION_FRONT', 'TotalFuelUsed', 'AirFilter', 'WORK_ON', 'PLC_R_Measured_position', 'DiffLockState', 'PLC_R_Draft', 'GearOilFilter')
+)

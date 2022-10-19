@@ -1,0 +1,30 @@
+config { 
+  type: "table",
+  schema: "dwh"
+}
+
+
+select
+  date,
+  vehicleId,
+  start_timestamp as start_ts,
+  end_timestamp as end_ts,
+  st_geogpoint(start_longitude, start_latitude) as start_pos,
+  st_geogpoint(end_longitude, end_latitude) as end_pos,
+  distance_km
+from (
+  select distinct
+    date,
+    vehicleId,
+    start_timestamp,
+    end_timestamp,
+    first_value(longitude) over(partition by vehicleId, start_timestamp order by timestamp) as start_longitude,
+    first_value(latitude) over(partition by vehicleId, start_timestamp order by timestamp) as start_latitude,
+    first_value(longitude) over(partition by vehicleId, start_timestamp order by timestamp desc) as end_longitude,
+    first_value(latitude) over(partition by vehicleId, start_timestamp order by timestamp desc) as end_latitude,
+    round(sum(distance_m) over(partition by vehicleId, start_timestamp)/1000, 3) as distance_km
+  from (
+    select *, st_distance(st_geogpoint(longitude, latitude), lead(st_geogpoint(longitude, latitude)) over (partition by vehicleid, start_timestamp order by timestamp)) as distance_m
+    from ${ref("stage_run_telemetry")}
+  )
+)

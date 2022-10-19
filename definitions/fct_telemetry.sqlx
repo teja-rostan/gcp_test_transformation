@@ -1,0 +1,138 @@
+config { 
+  type: "table",
+  schema: "dwh" 
+}
+
+with telematics_data as (
+select 
+  timestamp(t.DateTime) as `timestamp`,
+  date(t.DateTime) as `date`,
+  round(cast(t.GpsLongitude as float64), 7) as longitude,
+  round(cast(t.GpsLatitude as float64), 7) as latitude,
+  t.SerialNumber as vehicleId,
+  cast(t.TotalWorkingHours as float64) as working_h,
+  cast(t.FuelConsumption_l_h as float64) as fuelConsumption_l_h,
+  cast(t.SpeedGearbox_km_h as float64) as speed_km_h,
+  cast(t.TempAmbient_C as float64) as tempAmbient_C,
+  cast(t.TempCoolant_C as float64) as tempCoolant_C,
+  cast(t.Engine_rpm as float64) as engine_rpm,
+  t.DifferentialLockStatus as differentialLockStatus,
+  null as altitude,
+  null as course,
+from `elt-test-dev.datalake.telematics_dump` t
+union all
+select 
+  timestamp(w.dateTime),
+  date(w.dateTime),
+  round(cast(w.gpsLongitude as float64), 7),
+  round(cast(w.gpsLatitude as float64), 7),
+  m.telemetryVehicleId,
+  null,
+  null,
+  cast(w.speed as float64),
+  null,
+  null,
+  null,
+  null,
+  cast(w.altitude as float64),
+  cast(w.course as float64)
+from `elt-test-dev.datalake.wialon_dump` w
+join `elt-test-dev.datalake.wialon_telemetry_map` m on w.unit_id = m.wialonVehicleId
+join (select distinct SerialNumber from `datalake.telematics_dump`) e on m.telemetryVehicleId = e.SerialNumber
+where w.gpsLongitude is not null and w.gpsLatitude is not null and w.dateTime is not null
+)
+, fendt_data as (
+select 
+  timestamp_seconds(cast(g.t as int)) as `timestamp`,
+  date(timestamp_seconds(cast(g.t as int))) as `date`,
+  round(cast(g.lng as float64), 7) as longitude,
+  round(cast(g.lat as float64), 7) as latitude,
+  cast(g.machineId as string) as vehicleId,
+  cast(gp.TOTAL_VEHICLE_HOURS as float64) as working_h,
+  cast(gp.FuelRate as float64) as fuelConsumption_l_h,
+  cast(gp.WheelBasedVehicleSpeed as float64) as speed_km_h,
+  cast(gp.OutdoorTemp as float64) as tempAmbient_C,
+  cast(gp.CoolantTemperature as float64) as tempCoolant_C,
+  cast(gp.EngineSpeed as float64) as engine_rpm,
+  gp.DiffLockState as differentialLockStatus,
+  null as altitude,
+  null as course,
+from ${ref("stage_fendt_gps")} g
+left join ${ref("stage_fendt_data_partitioned_pivoted")} gp on g.machineId = gp.machineId and g.t = gp.values_timestamp
+union all
+select 
+  timestamp(w.dateTime),
+  date(w.dateTime),
+  round(cast(w.gpsLongitude as float64), 7),
+  round(cast(w.gpsLatitude as float64), 7),
+  m.telemetryVehicleId,
+  null,
+  null,
+  cast(w.speed as float64),
+  null,
+  null,
+  null,
+  null,
+  cast(w.altitude as float64),
+  cast(w.course as float64)
+from `elt-test-dev.datalake.wialon_dump` w
+join `elt-test-dev.datalake.wialon_telemetry_map` m on w.unit_id = m.wialonVehicleId
+join (select distinct cast(machineId as string) as vehicleId from `stage.fendt_gps`) e on m.telemetryVehicleId = e.vehicleId
+where w.gpsLongitude is not null and w.gpsLatitude is not null and w.dateTime is not null
+)
+, group_and_union as (
+select
+  `timestamp`,
+  `date`,
+  vehicleId,
+  avg(longitude) longitude,
+  avg(latitude) latitude,
+  avg(working_h) working_h,
+  avg(fuelConsumption_l_h) fuelConsumption_l_h,
+  avg(speed_km_h) speed_km_h,
+  avg(tempAmbient_C) tempAmbient_C,
+  avg(tempCoolant_C) tempCoolant_C,
+  avg(engine_rpm) engine_rpm,
+  max(differentialLockStatus) differentialLockStatus,
+  avg(altitude) altitude,
+  avg(course) course
+from telematics_data
+group by 1,2,3
+union all
+select
+  `timestamp`,
+  `date`,
+  vehicleId,
+  avg(longitude) longitude,
+  avg(latitude) latitude,
+  avg(working_h) working_h,
+  avg(fuelConsumption_l_h) fuelConsumption_l_h,
+  avg(speed_km_h) speed_km_h,
+  avg(tempAmbient_C) tempAmbient_C,
+  avg(tempCoolant_C) tempCoolant_C,
+  avg(engine_rpm) engine_rpm,
+  max(differentialLockStatus) differentialLockStatus,
+  avg(altitude) altitude,
+  avg(course) course
+from fendt_data
+group by 1,2,3
+)
+select
+  `timestamp`,
+  `date`,
+  longitude,
+  latitude,
+  ST_GeogPoint(longitude, latitude) AS position,
+  vehicleId,
+  working_h,
+  fuelConsumption_l_h,
+  speed_km_h,
+  tempAmbient_C,
+  tempCoolant_C,
+  engine_rpm,
+  differentialLockStatus,
+  altitude,
+  course
+from group_and_union
+order by 1
+
